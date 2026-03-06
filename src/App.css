@@ -22,7 +22,7 @@
 }
 
 .section {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   padding: 16px;
   background: white;
   border-radius: 8px;
@@ -32,9 +32,10 @@
 .section h3 {
   margin-top: 0;
   color: #475569;
-  font-size: 14px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  margin-bottom: 12px;
 }
 
 label {
@@ -44,13 +45,14 @@ label {
   font-size: 14px;
 }
 
-input[type="number"] {
+input[type="number"], input[type="text"] {
   width: 100%;
   padding: 8px;
   margin-top: 4px;
   border: 1px solid #cbd5e1;
   border-radius: 4px;
   font-size: 14px;
+  box-sizing: border-box;
 }
 
 button {
@@ -68,7 +70,6 @@ button {
 }
 
 button:hover:not(:disabled) {
-  background: #2563eb;
   transform: translateY(-1px);
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
@@ -80,6 +81,7 @@ button:disabled {
 
 button.danger {
   background: #ef4444;
+  margin-top: 12px;
 }
 
 button.danger:hover:not(:disabled) {
@@ -87,27 +89,46 @@ button.danger:hover:not(:disabled) {
 }
 
 .stats {
-  font-size: 13px;
-  color: #64748b;
-  line-height: 1.8;
+  font-size: 14px;
 }
 
-.stats div {
+.stat-row {
   display: flex;
   justify-content: space-between;
-  padding: 4px 0;
+  padding: 6px 0;
   border-bottom: 1px solid #f1f5f9;
 }
 
-.route-info {
-  background: #fdf2f8;
-  border: 1px solid #fbcfe8;
+.stat-row span {
+  color: #64748b;
 }
 
-.route-info div {
-  font-size: 13px;
-  color: #831843;
-  margin: 4px 0;
+.stat-row strong {
+  color: #1e293b;
+}
+
+.progress-bar {
+  margin-top: 12px;
+  height: 20px;
+  background: #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.progress-bar span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 11px;
+  font-weight: bold;
+  color: #1e293b;
 }
 
 .message {
@@ -148,23 +169,24 @@ button.danger:hover:not(:disabled) {
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
   font-size: 12px;
+  max-width: 200px;
 }
 
 .legend-item {
   display: flex;
   align-items: center;
-  margin: 6px 0;
+  margin: 8px 0;
   color: #334155;
 }
 
 .color-box {
-  width: 20px;
-  height: 3px;
+  width: 24px;
+  height: 16px;
   margin-right: 8px;
-  border-radius: 2px;
+  border-radius: 3px;
+  flex-shrink: 0;
 }
 
-/* Scrollbar styling */
 .sidebar::-webkit-scrollbar {
   width: 6px;
 }
