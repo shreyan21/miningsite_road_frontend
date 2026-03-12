@@ -1,7 +1,17 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
 .app {
   display: flex;
   height: 100vh;
   width: 100vw;
+  overflow: hidden;
 }
 
 .sidebar {
@@ -11,12 +21,13 @@
   padding: 20px;
   overflow-y: auto;
   box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+  flex-shrink: 0;
 }
 
 .sidebar h1 {
   font-size: 20px;
   color: #1e293b;
-  margin-bottom: 20px;
+  margin: 0 0 20px 0;
   padding-bottom: 10px;
   border-bottom: 2px solid #3b82f6;
 }
@@ -30,12 +41,11 @@
 }
 
 .section h3 {
-  margin-top: 0;
+  margin: 0 0 12px 0;
   color: #475569;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin-bottom: 12px;
 }
 
 label {
@@ -45,14 +55,26 @@ label {
   font-size: 14px;
 }
 
-input[type="number"], input[type="text"] {
+label.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  cursor: pointer;
+}
+
+input[type="number"] {
   width: 100%;
   padding: 8px;
   margin-top: 4px;
   border: 1px solid #cbd5e1;
   border-radius: 4px;
   font-size: 14px;
-  box-sizing: border-box;
+}
+
+input[type="checkbox"] {
+  width: auto;
+  margin: 0;
 }
 
 button {
@@ -79,13 +101,31 @@ button:disabled {
   cursor: not-allowed;
 }
 
-button.danger {
+.btn-primary {
+  background: #16a34a;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #15803d;
+}
+
+.btn-danger {
   background: #ef4444;
   margin-top: 12px;
 }
 
-button.danger:hover:not(:disabled) {
+.btn-danger:hover:not(:disabled) {
   background: #dc2626;
+}
+
+.progress-text {
+  margin-top: 8px;
+  padding: 8px;
+  background: #dbeafe;
+  color: #1e40af;
+  border-radius: 4px;
+  font-size: 12px;
+  text-align: center;
 }
 
 .stats {
@@ -99,6 +139,10 @@ button.danger:hover:not(:disabled) {
   border-bottom: 1px solid #f1f5f9;
 }
 
+.stat-row:last-child {
+  border-bottom: none;
+}
+
 .stat-row span {
   color: #64748b;
 }
@@ -107,8 +151,11 @@ button.danger:hover:not(:disabled) {
   color: #1e293b;
 }
 
-.progress-bar {
+.progress-bar-container {
   margin-top: 12px;
+}
+
+.progress-bar {
   height: 20px;
   background: #e2e8f0;
   border-radius: 10px;
@@ -121,14 +168,12 @@ button.danger:hover:not(:disabled) {
   transition: width 0.3s ease;
 }
 
-.progress-bar span {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+.progress-label {
+  display: block;
+  text-align: center;
   font-size: 11px;
-  font-weight: bold;
-  color: #1e293b;
+  color: #64748b;
+  margin-top: 4px;
 }
 
 .message {
@@ -153,6 +198,7 @@ button.danger:hover:not(:disabled) {
 .map-container {
   flex: 1;
   position: relative;
+  min-width: 0;
 }
 
 .map {
@@ -169,7 +215,7 @@ button.danger:hover:not(:disabled) {
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
   font-size: 12px;
-  max-width: 200px;
+  max-width: 220px;
 }
 
 .legend-item {
@@ -198,4 +244,65 @@ button.danger:hover:not(:disabled) {
 .sidebar::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 3px;
+}
+
+@media (max-width: 768px) {
+  .app {
+    flex-direction: column;
+  }
+  
+  .sidebar {
+    width: 100%;
+    height: 40vh;
+  }
+  
+  .map-container {
+    height: 60vh;
+  }
+}
+/* Add these to your existing CSS */
+
+.failed {
+  color: #dc2626;
+}
+
+.stat-row.failed strong {
+  color: #dc2626;
+}
+
+.failed-section {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.failed-section h3 {
+  color: #991b1b;
+}
+
+.failed-list {
+  max-height: 150px;
+  overflow-y: auto;
+  font-size: 11px;
+}
+
+.failed-item {
+  padding: 4px 0;
+  border-bottom: 1px solid #fecaca;
+  color: #7f1d1d;
+}
+
+.failed-more {
+  padding: 4px 0;
+  color: #991b1b;
+  font-style: italic;
+}
+
+/* Scrollbar for failed list */
+.failed-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.failed-list::-webkit-scrollbar-thumb {
+  background: #fca5a5;
+  border-radius: 2px;
 }
