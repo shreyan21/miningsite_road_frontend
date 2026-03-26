@@ -263,6 +263,20 @@ button.ghost:hover:not(:disabled) {
   border: 1px solid rgba(251, 146, 60, 0.18);
 }
 
+.failed-button {
+  width: 100%;
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+  background: rgba(255, 247, 237, 0.84);
+  border: 1px solid rgba(251, 146, 60, 0.18);
+}
+
+.failed-button:hover:not(:disabled) {
+  background: rgba(255, 237, 213, 0.96);
+  transform: translateY(-1px);
+}
+
 .failed-item strong,
 .failed-item span,
 .failed-item p {
@@ -289,6 +303,11 @@ button.ghost:hover:not(:disabled) {
 .flash-error {
   color: #7f1d1d;
   border-color: rgba(220, 38, 38, 0.22);
+}
+
+.selected-panel p {
+  margin: 6px 0 0;
+  color: var(--muted);
 }
 
 .map-panel {

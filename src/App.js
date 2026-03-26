@@ -59,9 +59,17 @@ const styles = {
 const parseGeoJsonFeatures = (geojson) =>
   new GeoJSON().readFeatures(geojson, { featureProjection: 'EPSG:3857' });
 
-const getMiningStyle = (showLabels) => (feature) => {
+const getMiningStyle = (showLabels, selectedMiningId) => (feature) => {
   const isConnected = feature.get('is_connected');
   const style = (isConnected ? styles.miningConnected : styles.miningUnconnected).clone();
+  const isSelected = Number(feature.getId()) === Number(selectedMiningId);
+
+  if (isSelected) {
+    style.getStroke().setColor('#facc15');
+    style.getStroke().setWidth(3.5);
+    style.setZIndex(20);
+  }
+
   style.getText().setText(showLabels ? String(feature.get('name') || '').slice(0, 20) : '');
   return style;
 };
@@ -82,6 +90,8 @@ function App() {
   const [statistics, setStatistics] = useState({});
   const [failedSites, setFailedSites] = useState([]);
   const [plannerLabel, setPlannerLabel] = useState('');
+  const [selectedMiningId, setSelectedMiningId] = useState(null);
+  const [selectedSiteInfo, setSelectedSiteInfo] = useState(null);
 
   const createLayer = (style, visible = true) =>
     new VectorLayer({
@@ -205,9 +215,36 @@ function App() {
     layersRef.current.rivers = createLayer(styles.river);
     layersRef.current.schools = createLayer(styles.school, false);
     layersRef.current.schoolBuffers = createLayer(styles.schoolBuffer, false);
-    layersRef.current.miningSites = createLayer(getMiningStyle(showLabels));
+    layersRef.current.miningSites = createLayer(getMiningStyle(showLabels, null));
 
     Object.values(layersRef.current).forEach((layer) => map.addLayer(layer));
+
+    map.on('singleclick', (event) => {
+      let pickedFeature = null;
+
+      map.forEachFeatureAtPixel(event.pixel, (feature, layer) => {
+        if (layer === layersRef.current.miningSites) {
+          pickedFeature = feature;
+          return true;
+        }
+        return false;
+      });
+
+      if (!pickedFeature) {
+        setSelectedMiningId(null);
+        setSelectedSiteInfo(null);
+        return;
+      }
+
+      setSelectedMiningId(Number(pickedFeature.getId()));
+      setSelectedSiteInfo({
+        gid: Number(pickedFeature.getId()),
+        name: pickedFeature.get('name') || 'Mining site',
+        isConnected: Boolean(pickedFeature.get('is_connected')),
+        reasonCode: pickedFeature.get('reason_code') || null,
+        pathStrategy: pickedFeature.get('path_strategy') || null,
+      });
+    });
 
     mapRef.current = map;
     void refreshMap({ fitView: true });
@@ -219,9 +256,33 @@ function App() {
   useEffect(() => {
     const miningLayer = layersRef.current.miningSites;
     if (miningLayer) {
-      miningLayer.setStyle(getMiningStyle(showLabels));
+      miningLayer.setStyle(getMiningStyle(showLabels, selectedMiningId));
     }
-  }, [showLabels]);
+  }, [showLabels, selectedMiningId]);
+
+  const zoomToMiningSite = (gid) => {
+    const miningLayer = layersRef.current.miningSites;
+    const map = mapRef.current;
+    if (!miningLayer || !map) return;
+
+    const feature = miningLayer.getSource().getFeatureById(Number(gid));
+    if (!feature) return;
+
+    setSelectedMiningId(Number(gid));
+    setSelectedSiteInfo({
+      gid: Number(gid),
+      name: feature.get('name') || 'Mining site',
+      isConnected: Boolean(feature.get('is_connected')),
+      reasonCode: feature.get('reason_code') || null,
+      pathStrategy: feature.get('path_strategy') || null,
+    });
+
+    map.getView().fit(feature.getGeometry().getExtent(), {
+      padding: [60, 60, 60, 60],
+      duration: 250,
+      maxZoom: 16,
+    });
+  };
 
   useEffect(() => {
     const schoolsLayer = layersRef.current.schools;
@@ -260,6 +321,7 @@ function App() {
         {
           schoolBuffer,
           batchSize: batchSize ? Number(batchSize) : null,
+          appendMode: true,
         },
         { timeout: 600000 },
       );
@@ -299,10 +361,10 @@ function App() {
       <aside className="sidebar">
         <div className="hero">
           <p className="eyebrow">Mining Road Planner</p>
-          <h1>Least-cost connection workspace</h1>
+          <h1>Shortest-route connection workspace</h1>
           <p className="hero-copy">
-            Roads connect from each mining boundary to the active road network. If you add new road
-            layers later, future runs will use them automatically.
+            Roads connect from each mining boundary to the active road network. Each new batch
+            continues from your previous progress, and future road layers are used automatically.
           </p>
           <p className="hero-note">
             Current mode: <strong>{plannerLabel || 'loading'}</strong>
@@ -335,7 +397,7 @@ function App() {
               min="1"
               value={batchSize}
               onChange={(event) => setBatchSize(event.target.value)}
-              placeholder={`Leave empty for all ${statistics.total_mining_sites || 0} sites`}
+              placeholder={`Next ${statistics.pending_sites || statistics.total_mining_sites || 0} pending sites`}
             />
           </label>
 
@@ -368,10 +430,10 @@ function App() {
 
           <div className="button-row">
             <button type="button" className="accent" onClick={handleGenerateRoads} disabled={loading}>
-              {loading ? 'Working...' : 'Generate roads'}
+              {loading ? 'Working...' : 'Generate next batch'}
             </button>
             <button type="button" className="danger" onClick={handleResetNetwork} disabled={loading}>
-              Reset generated roads
+              Start from scratch
             </button>
           </div>
         </section>
@@ -392,8 +454,8 @@ function App() {
               <strong>{statistics.blocked_sites || 0}</strong>
             </div>
             <div className="stat-card">
-              <span>Generated roads</span>
-              <strong>{statistics.new_roads_count || 0}</strong>
+              <span>Pending</span>
+              <strong>{statistics.pending_sites || 0}</strong>
             </div>
           </div>
 
@@ -402,6 +464,12 @@ function App() {
               <div className="progress-fill" style={{ width: `${completionPercent}%` }} />
             </div>
             <p>{completionPercent}% connected</p>
+            <p>
+              Processed sites: <strong>{statistics.processed_sites || 0}</strong>
+            </p>
+            <p>
+              Generated roads: <strong>{statistics.new_roads_count || 0}</strong>
+            </p>
             <p>
               Total generated length:{' '}
               <strong>{Number(statistics.new_roads_length || 0).toFixed(2)} km</strong>
@@ -414,16 +482,32 @@ function App() {
             <h2>Blocked during last run</h2>
             <div className="failed-list">
               {failedSites.slice(0, 8).map((site) => (
-                <div key={`${site.gid}-${site.code || 'x'}`} className="failed-item">
+                <button
+                  type="button"
+                  key={`${site.gid}-${site.code || 'x'}`}
+                  className="failed-item failed-button"
+                  onClick={() => zoomToMiningSite(site.gid)}
+                >
                   <strong>Site {site.gid}</strong>
                   <span>{site.code || 'BLOCKED'}</span>
                   <p>{site.reason}</p>
-                </div>
+                </button>
               ))}
               {failedSites.length > 8 && (
                 <p className="more-text">Showing first 8 blocked sites.</p>
               )}
             </div>
+          </section>
+        )}
+
+        {selectedSiteInfo && (
+          <section className="panel compact-panel selected-panel">
+            <h2>Selected site</h2>
+            <p><strong>Site {selectedSiteInfo.gid}</strong></p>
+            <p>{selectedSiteInfo.name}</p>
+            <p>Status: {selectedSiteInfo.isConnected ? 'Connected' : 'Blocked / pending'}</p>
+            {selectedSiteInfo.reasonCode && <p>Reason: {selectedSiteInfo.reasonCode}</p>}
+            {selectedSiteInfo.pathStrategy && <p>Planner: {selectedSiteInfo.pathStrategy}</p>}
           </section>
         )}
 
