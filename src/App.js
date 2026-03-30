@@ -97,7 +97,7 @@ function App() {
   const [plannerLabel, setPlannerLabel] = useState('');
   const [selectedMiningIds, setSelectedMiningIds] = useState([]);
   const [selectedSiteInfo, setSelectedSiteInfo] = useState(null);
-  const [runtimeConfig, setRuntimeConfig] = useState({ maximumBatchSize: 60, topBanner: null });
+  const [runtimeConfig, setRuntimeConfig] = useState({ maximumBatchSize: 60, defaultBatchSize: 4, topBanner: null });
   const [generationProgress, setGenerationProgress] = useState(null);
   const [generationJobId, setGenerationJobId] = useState(null);
 
@@ -173,7 +173,9 @@ function App() {
 
   const loadRuntimeConfig = async () => {
     const response = await axios.get(`${API_URL}/runtime-config`);
-    setRuntimeConfig(response.data || { maximumBatchSize: 60, topBanner: null });
+    const config = response.data || { maximumBatchSize: 60, defaultBatchSize: 4, topBanner: null };
+    setRuntimeConfig(config);
+    setBatchSize((current) => current || String(config.defaultBatchSize || 4));
   };
 
   const loadSchoolsLayer = async () => {
@@ -377,7 +379,7 @@ function App() {
   }, [showSchoolBuffers, schoolBuffer]);
 
   const handleGenerateRoads = async () => {
-    const numericBatchSize = batchSize ? Number(batchSize) : null;
+    const numericBatchSize = batchSize ? Number(batchSize) : Number(runtimeConfig.defaultBatchSize || 4);
     const maxBatchSize = Number(runtimeConfig.maximumBatchSize || 60);
 
     if (numericBatchSize && numericBatchSize > maxBatchSize) {
@@ -407,6 +409,7 @@ function App() {
           batchSize: numericBatchSize,
           appendMode: true,
           async: true,
+          retryBlocked: false,
         },
         { timeout: 600000 },
       );
@@ -565,12 +568,13 @@ function App() {
               max={runtimeConfig.maximumBatchSize || 60}
               value={batchSize}
               onChange={(event) => setBatchSize(event.target.value)}
-              placeholder={`Next ${statistics.pending_sites || statistics.total_mining_sites || 0} pending sites`}
+              placeholder={`Default ${runtimeConfig.defaultBatchSize || 4} sites per batch`}
             />
           </label>
 
           <p className="field-hint">
             Select up to <strong>{runtimeConfig.maximumBatchSize || 60}</strong> sites per run.
+            {' '}Default batch size is <strong>{runtimeConfig.defaultBatchSize || 4}</strong> for faster runs.
           </p>
 
           <div className="toggles">
