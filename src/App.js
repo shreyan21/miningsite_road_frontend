@@ -59,10 +59,13 @@ const styles = {
 const parseGeoJsonFeatures = (geojson) =>
   new GeoJSON().readFeatures(geojson, { featureProjection: 'EPSG:3857' });
 
-const getMiningStyle = (showLabels, selectedMiningId) => (feature) => {
+const getMiningStyle = (showLabels, selectedMiningIds = []) => {
+  const selectedSet = new Set(selectedMiningIds.map((value) => Number(value)));
+
+  return (feature) => {
   const isConnected = feature.get('is_connected');
   const style = (isConnected ? styles.miningConnected : styles.miningUnconnected).clone();
-  const isSelected = Number(feature.getId()) === Number(selectedMiningId);
+  const isSelected = selectedSet.has(Number(feature.getId()));
 
   if (isSelected) {
     style.getStroke().setColor('#facc15');
@@ -72,6 +75,7 @@ const getMiningStyle = (showLabels, selectedMiningId) => (feature) => {
 
   style.getText().setText(showLabels ? String(feature.get('name') || '').slice(0, 20) : '');
   return style;
+  };
 };
 
 function App() {
@@ -79,6 +83,7 @@ function App() {
   const mapRef = useRef(null);
   const layersRef = useRef({});
   const fittedRef = useRef(false);
+  const progressTimerRef = useRef(null);
 
   const [schoolBuffer, setSchoolBuffer] = useState(500);
   const [batchSize, setBatchSize] = useState('');
@@ -90,8 +95,11 @@ function App() {
   const [statistics, setStatistics] = useState({});
   const [failedSites, setFailedSites] = useState([]);
   const [plannerLabel, setPlannerLabel] = useState('');
-  const [selectedMiningId, setSelectedMiningId] = useState(null);
+  const [selectedMiningIds, setSelectedMiningIds] = useState([]);
   const [selectedSiteInfo, setSelectedSiteInfo] = useState(null);
+  const [runtimeConfig, setRuntimeConfig] = useState({ maximumBatchSize: 60, topBanner: null });
+  const [generationProgress, setGenerationProgress] = useState(null);
+  const [generationJobId, setGenerationJobId] = useState(null);
 
   const createLayer = (style, visible = true) =>
     new VectorLayer({
@@ -163,6 +171,11 @@ function App() {
     }
   };
 
+  const loadRuntimeConfig = async () => {
+    const response = await axios.get(`${API_URL}/runtime-config`);
+    setRuntimeConfig(response.data || { maximumBatchSize: 60, topBanner: null });
+  };
+
   const loadSchoolsLayer = async () => {
     const response = await axios.get(`${API_URL}/schools`);
     setLayerFeatures('schools', parseGeoJsonFeatures(response.data));
@@ -200,6 +213,48 @@ function App() {
     }
   };
 
+  const stopProgressPolling = () => {
+    if (progressTimerRef.current) {
+      window.clearTimeout(progressTimerRef.current);
+      progressTimerRef.current = null;
+    }
+  };
+
+  const pollGenerationProgress = async (jobId) => {
+    try {
+      const response = await axios.get(`${API_URL}/generate-all-roads-progress/${jobId}`);
+      const job = response.data;
+      setGenerationProgress(job.progress || null);
+
+      if (job.status === 'completed') {
+        stopProgressPolling();
+        setGenerationJobId(null);
+        setFailedSites(job.result?.failedDetails || []);
+        setMessage(job.result?.message || 'Road generation completed.');
+        setLoading(false);
+        await refreshMap();
+        return;
+      }
+
+      if (job.status === 'failed') {
+        stopProgressPolling();
+        setGenerationJobId(null);
+        setMessage(`Error: ${job.error?.message || 'Road generation failed.'}`);
+        setLoading(false);
+        return;
+      }
+
+      progressTimerRef.current = window.setTimeout(() => {
+        void pollGenerationProgress(jobId);
+      }, 1200);
+    } catch (error) {
+      stopProgressPolling();
+      setGenerationJobId(null);
+      setMessage(`Error: ${error.response?.data?.error || error.message}`);
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     const map = new Map({
       target: mapElementRef.current,
@@ -215,7 +270,7 @@ function App() {
     layersRef.current.rivers = createLayer(styles.river);
     layersRef.current.schools = createLayer(styles.school, false);
     layersRef.current.schoolBuffers = createLayer(styles.schoolBuffer, false);
-    layersRef.current.miningSites = createLayer(getMiningStyle(showLabels, null));
+    layersRef.current.miningSites = createLayer(getMiningStyle(showLabels, []));
 
     Object.values(layersRef.current).forEach((layer) => map.addLayer(layer));
 
@@ -231,14 +286,19 @@ function App() {
       });
 
       if (!pickedFeature) {
-        setSelectedMiningId(null);
+        setSelectedMiningIds([]);
         setSelectedSiteInfo(null);
         return;
       }
 
-      setSelectedMiningId(Number(pickedFeature.getId()));
+      const gid = Number(pickedFeature.getId());
+      setSelectedMiningIds((current) => (
+        current.includes(gid)
+          ? current.filter((value) => value !== gid)
+          : [...current, gid]
+      ));
       setSelectedSiteInfo({
-        gid: Number(pickedFeature.getId()),
+        gid,
         name: pickedFeature.get('name') || 'Mining site',
         isConnected: Boolean(pickedFeature.get('is_connected')),
         reasonCode: pickedFeature.get('reason_code') || null,
@@ -247,18 +307,22 @@ function App() {
     });
 
     mapRef.current = map;
+    void loadRuntimeConfig().catch(() => {});
     void refreshMap({ fitView: true });
 
-    return () => map.setTarget(undefined);
+    return () => {
+      stopProgressPolling();
+      map.setTarget(undefined);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     const miningLayer = layersRef.current.miningSites;
     if (miningLayer) {
-      miningLayer.setStyle(getMiningStyle(showLabels, selectedMiningId));
+      miningLayer.setStyle(getMiningStyle(showLabels, selectedMiningIds));
     }
-  }, [showLabels, selectedMiningId]);
+  }, [showLabels, selectedMiningIds]);
 
   const zoomToMiningSite = (gid) => {
     const miningLayer = layersRef.current.miningSites;
@@ -268,7 +332,9 @@ function App() {
     const feature = miningLayer.getSource().getFeatureById(Number(gid));
     if (!feature) return;
 
-    setSelectedMiningId(Number(gid));
+    setSelectedMiningIds((current) => (
+      current.includes(Number(gid)) ? current : [...current, Number(gid)]
+    ));
     setSelectedSiteInfo({
       gid: Number(gid),
       name: feature.get('name') || 'Mining site',
@@ -311,22 +377,107 @@ function App() {
   }, [showSchoolBuffers, schoolBuffer]);
 
   const handleGenerateRoads = async () => {
+    const numericBatchSize = batchSize ? Number(batchSize) : null;
+    const maxBatchSize = Number(runtimeConfig.maximumBatchSize || 60);
+
+    if (numericBatchSize && numericBatchSize > maxBatchSize) {
+      setMessage(`Error: A maximum of ${maxBatchSize} sites can be selected in one run.`);
+      return;
+    }
+
     setLoading(true);
     setMessage('');
     setFailedSites([]);
+    setGenerationProgress({
+      stage: 'starting',
+      processedSites: 0,
+      connectedSites: 0,
+      failedSites: 0,
+      percentComplete: 0,
+      queuedSites: numericBatchSize || 0,
+      selectedSites: numericBatchSize || 0,
+      maximumBatchSize: maxBatchSize,
+    });
 
     try {
       const response = await axios.post(
         `${API_URL}/generate-all-roads`,
         {
           schoolBuffer,
-          batchSize: batchSize ? Number(batchSize) : null,
+          batchSize: numericBatchSize,
           appendMode: true,
+          async: true,
         },
         { timeout: 600000 },
       );
 
+      setGenerationJobId(response.data.jobId);
+      setGenerationProgress(response.data.progress || null);
+      await pollGenerationProgress(response.data.jobId);
+    } catch (error) {
+      setGenerationProgress(null);
+      setLoading(false);
+      setMessage(`Error: ${error.response?.data?.error || error.message}`);
+    }
+  };
+
+  const handleGenerateSelectedRoads = async () => {
+    if (selectedMiningIds.length === 0) {
+      setMessage('Error: Select at least one mining site on the map first.');
+      return;
+    }
+
+    setLoading(true);
+    setFailedSites([]);
+    setMessage('');
+
+    try {
+      const response = await axios.post(`${API_URL}/generate-selected-roads`, {
+        miningGids: selectedMiningIds,
+        schoolBuffer,
+        replaceExisting: true,
+      });
+
       setFailedSites(response.data.failedDetails || []);
+      setMessage(response.data.message);
+      await refreshMap();
+    } catch (error) {
+      setMessage(`Error: ${error.response?.data?.error || error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRemoveSelectedRoads = async () => {
+    if (selectedMiningIds.length === 0) {
+      setMessage('Error: Select at least one mining site on the map first.');
+      return;
+    }
+
+    setLoading(true);
+    setFailedSites([]);
+    setMessage('');
+
+    try {
+      const response = await axios.post(`${API_URL}/remove-selected-roads`, {
+        miningGids: selectedMiningIds,
+      });
+
+      setMessage(response.data.message);
+      await refreshMap();
+    } catch (error) {
+      setMessage(`Error: ${error.response?.data?.error || error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSyncRoadSources = async () => {
+    setLoading(true);
+    setMessage('');
+
+    try {
+      const response = await axios.post(`${API_URL}/road-sources/sync`);
       setMessage(response.data.message);
       await refreshMap();
     } catch (error) {
@@ -340,6 +491,9 @@ function App() {
     setLoading(true);
     setFailedSites([]);
     setMessage('');
+    setGenerationProgress(null);
+    setGenerationJobId(null);
+    stopProgressPolling();
 
     try {
       const response = await axios.post(`${API_URL}/reset-network`);
@@ -355,10 +509,18 @@ function App() {
   const completionPercent = statistics.total_mining_sites
     ? ((Number(statistics.connected_sites || 0) / Number(statistics.total_mining_sites)) * 100).toFixed(1)
     : '0.0';
+  const liveProgressPercent = generationProgress?.percentComplete ?? 0;
+  const topBannerMessage = runtimeConfig.topBanner?.message || `A maximum of ${runtimeConfig.maximumBatchSize || 60} sites can be selected in one run.`;
+  const isGenerating = Boolean(generationJobId || generationProgress);
 
   return (
     <div className="app-shell">
       <aside className="sidebar">
+        <section className="top-banner">
+          <strong>Site selection limit</strong>
+          <span>{topBannerMessage}</span>
+        </section>
+
         <div className="hero">
           <p className="eyebrow">Mining Road Planner</p>
           <h1>Shortest-route connection workspace</h1>
@@ -374,9 +536,14 @@ function App() {
         <section className="panel">
           <div className="panel-head">
             <h2>Run settings</h2>
-            <button type="button" className="ghost" onClick={() => refreshMap()} disabled={loading}>
-              Refresh
-            </button>
+            <div className="inline-actions">
+              <button type="button" className="ghost" onClick={handleSyncRoadSources} disabled={loading}>
+                Sync imported roads
+              </button>
+              <button type="button" className="ghost" onClick={() => refreshMap()} disabled={loading}>
+                Refresh
+              </button>
+            </div>
           </div>
 
           <label className="field">
@@ -395,11 +562,16 @@ function App() {
             <input
               type="number"
               min="1"
+              max={runtimeConfig.maximumBatchSize || 60}
               value={batchSize}
               onChange={(event) => setBatchSize(event.target.value)}
               placeholder={`Next ${statistics.pending_sites || statistics.total_mining_sites || 0} pending sites`}
             />
           </label>
+
+          <p className="field-hint">
+            Select up to <strong>{runtimeConfig.maximumBatchSize || 60}</strong> sites per run.
+          </p>
 
           <div className="toggles">
             <label className="toggle">
@@ -435,6 +607,63 @@ function App() {
             <button type="button" className="danger" onClick={handleResetNetwork} disabled={loading}>
               Start from scratch
             </button>
+          </div>
+        </section>
+
+        <section className="panel compact-panel">
+          <h2>Selected mining sites</h2>
+          <p className="field-hint">
+            Click mining polygons on the map to select one or more sites.
+          </p>
+          <div className="selection-summary">
+            <strong>{selectedMiningIds.length}</strong>
+            <span>site(s) selected</span>
+          </div>
+          {selectedMiningIds.length > 0 && (
+            <div className="selected-chips">
+              {selectedMiningIds.slice(0, 12).map((gid) => (
+                <button
+                  type="button"
+                  key={gid}
+                  className="chip-button"
+                  onClick={() => zoomToMiningSite(gid)}
+                >
+                  Site {gid}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="button-row">
+            <button type="button" className="accent" onClick={handleGenerateSelectedRoads} disabled={loading || selectedMiningIds.length === 0}>
+              Generate selected connectivity
+            </button>
+            <button type="button" className="danger" onClick={handleRemoveSelectedRoads} disabled={loading || selectedMiningIds.length === 0}>
+              Remove selected roads
+            </button>
+          </div>
+        </section>
+
+        <section className="panel compact-panel">
+          <h2>Current run progress</h2>
+          <div className="progress-panel live-progress-panel">
+            <div className="progress-bar">
+              <div className="progress-fill live-progress-fill" style={{ width: `${liveProgressPercent}%` }} />
+            </div>
+            <p>{liveProgressPercent}% complete</p>
+            <p>
+              Processed in current run: <strong>{generationProgress?.processedSites || 0}</strong>
+              {' / '}
+              <strong>{generationProgress?.queuedSites || generationProgress?.selectedSites || 0}</strong>
+            </p>
+            <p>
+              Roads generated in current run: <strong>{generationProgress?.connectedSites || 0}</strong>
+            </p>
+            <p>
+              Failed in current run: <strong>{generationProgress?.failedSites || 0}</strong>
+            </p>
+            <p>
+              Status: <strong>{generationProgress?.stage || (isGenerating ? 'running' : 'idle')}</strong>
+            </p>
           </div>
         </section>
 

@@ -45,6 +45,29 @@ body {
   padding-right: 4px;
 }
 
+.top-banner {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  background: linear-gradient(135deg, #fff7ed, #fffbeb);
+  border: 1px solid rgba(251, 146, 60, 0.28);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  color: #9a3412;
+}
+
+.top-banner strong {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.top-banner span {
+  font-size: 14px;
+  line-height: 1.45;
+}
+
 .hero,
 .panel,
 .flash {
@@ -98,6 +121,12 @@ body {
   margin-bottom: 10px;
 }
 
+.inline-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .panel h2,
 .legend h3 {
   margin: 0;
@@ -115,6 +144,13 @@ body {
   font-size: 13px;
   font-weight: 600;
   color: var(--muted);
+}
+
+.field-hint {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 input[type="number"] {
@@ -150,6 +186,40 @@ input[type="number"]:focus {
 .button-row {
   display: grid;
   gap: 10px;
+}
+
+.selection-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 12px 0;
+  color: var(--muted);
+}
+
+.selection-summary strong {
+  font-size: 28px;
+  color: var(--text);
+}
+
+.selected-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.chip-button {
+  width: auto;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #efe8ff;
+  color: #4c1d95;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.chip-button:hover:not(:disabled) {
+  background: #e3d7ff;
 }
 
 button {
@@ -233,6 +303,10 @@ button.ghost:hover:not(:disabled) {
   font-size: 14px;
 }
 
+.live-progress-panel {
+  margin-top: 8px;
+}
+
 .progress-bar {
   height: 10px;
   border-radius: 999px;
@@ -244,6 +318,10 @@ button.ghost:hover:not(:disabled) {
 .progress-fill {
   height: 100%;
   background: linear-gradient(90deg, #2563eb, #15803d);
+}
+
+.live-progress-fill {
+  background: linear-gradient(90deg, #0f766e, #2563eb);
 }
 
 .warning-panel {
