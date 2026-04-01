@@ -227,6 +227,12 @@ function App() {
       const response = await axios.get(`${API_URL}/generate-all-roads-progress/${jobId}`);
       const job = response.data;
       setGenerationProgress(job.progress || null);
+      if (job.progress) {
+        const processedSites = job.progress.processedSites || 0;
+        const queuedSites = job.progress.queuedSites || job.progress.selectedSites || 0;
+        const connectedSites = job.progress.connectedSites || 0;
+        setMessage(`Processing roads: ${processedSites}/${queuedSites} sites checked, ${connectedSites} roads generated so far.`);
+      }
 
       if (job.status === 'completed') {
         stopProgressPolling();
@@ -400,6 +406,7 @@ function App() {
       selectedSites: numericBatchSize || 0,
       maximumBatchSize: maxBatchSize,
     });
+    setMessage(`Processing roads for ${numericBatchSize || 0} site(s). Larger batches like 22 sites can take longer.`);
 
     try {
       const response = await axios.post(
@@ -515,6 +522,7 @@ function App() {
   const liveProgressPercent = generationProgress?.percentComplete ?? 0;
   const topBannerMessage = runtimeConfig.topBanner?.message || `A maximum of ${runtimeConfig.maximumBatchSize || 60} sites can be selected in one run.`;
   const isGenerating = Boolean(generationJobId || generationProgress);
+  const currentRunTotal = generationProgress?.queuedSites || generationProgress?.selectedSites || 0;
 
   return (
     <div className="app-shell">
@@ -535,6 +543,23 @@ function App() {
             Current mode: <strong>{plannerLabel || 'loading'}</strong>
           </p>
         </div>
+
+        {isGenerating && (
+          <section className="processing-banner">
+            <div className="processing-banner-row">
+              <strong>Batch processing in progress</strong>
+              <span>{liveProgressPercent}%</span>
+            </div>
+            <p>
+              {generationProgress?.processedSites || 0} / {currentRunTotal} sites checked,{' '}
+              {generationProgress?.connectedSites || 0} roads generated,{' '}
+              {generationProgress?.failedSites || 0} blocked so far.
+            </p>
+            <div className="progress-bar progress-bar-large">
+              <div className="progress-fill live-progress-fill" style={{ width: `${liveProgressPercent}%` }} />
+            </div>
+          </section>
+        )}
 
         <section className="panel">
           <div className="panel-head">
@@ -606,7 +631,7 @@ function App() {
 
           <div className="button-row">
             <button type="button" className="accent" onClick={handleGenerateRoads} disabled={loading}>
-              {loading ? 'Working...' : 'Generate next batch'}
+              {loading ? `Processing ${currentRunTotal || batchSize || runtimeConfig.defaultBatchSize || 4} site(s)...` : 'Generate next batch'}
             </button>
             <button type="button" className="danger" onClick={handleResetNetwork} disabled={loading}>
               Start from scratch

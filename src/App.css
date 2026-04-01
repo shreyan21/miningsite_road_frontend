@@ -68,6 +68,42 @@ body {
   line-height: 1.45;
 }
 
+.processing-banner {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  background: linear-gradient(135deg, #ecfeff, #eff6ff);
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+
+.processing-banner-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.processing-banner-row strong {
+  color: #1d4ed8;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.processing-banner-row span {
+  color: #0f766e;
+  font-weight: 700;
+}
+
+.processing-banner p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
 .hero,
 .panel,
 .flash {
@@ -313,6 +349,11 @@ button.ghost:hover:not(:disabled) {
   background: rgba(120, 113, 108, 0.14);
   overflow: hidden;
   margin-bottom: 10px;
+}
+
+.progress-bar-large {
+  height: 12px;
+  margin-bottom: 0;
 }
 
 .progress-fill {
