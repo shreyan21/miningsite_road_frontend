@@ -502,6 +502,11 @@ button.ghost:hover:not(:disabled) {
   background: #ff6b00;
 }
 
+.swatch-school-buffer {
+  background: rgba(255, 138, 31, 0.14);
+  border: 2px solid #ff8a1f;
+}
+
 .swatch-river {
   background: #0057d9;
 }

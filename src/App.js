@@ -17,13 +17,16 @@ const API_URL = 'http://localhost:5000/api';
 const styles = {
   highway: new Style({
     stroke: new Stroke({ color: '#5b5b5b', width: 2.9 }),
+    zIndex: 10,
   }),
   miningAccess: new Style({
     stroke: new Stroke({ color: '#8b5a3c', width: 3.3, lineDash: [10, 6] }),
+    zIndex: 20,
   }),
   river: new Style({
     stroke: new Stroke({ color: '#0057d9', width: 2.6 }),
     fill: new Fill({ color: 'rgba(64, 156, 255, 0.28)' }),
+    zIndex: 15,
   }),
   school: new Style({
     image: new CircleStyle({
@@ -31,10 +34,12 @@ const styles = {
       fill: new Fill({ color: '#ff6b00' }),
       stroke: new Stroke({ color: '#fff7ed', width: 1 }),
     }),
+    zIndex: 40,
   }),
   schoolBuffer: new Style({
-    stroke: new Stroke({ color: '#ff8a1f', width: 1.6, lineDash: [6, 5] }),
-    fill: new Fill({ color: 'rgba(255, 138, 31, 0.1)' }),
+    stroke: new Stroke({ color: '#ff8a1f', width: 2, lineDash: [6, 5] }),
+    fill: new Fill({ color: 'rgba(255, 138, 31, 0.14)' }),
+    zIndex: 30,
   }),
   miningUnconnected: new Style({
     fill: new Fill({ color: 'rgba(190, 24, 93, 0.18)' }),
@@ -44,6 +49,7 @@ const styles = {
       fill: new Fill({ color: '#831843' }),
       stroke: new Stroke({ color: '#fff1f2', width: 3 }),
     }),
+    zIndex: 50,
   }),
   miningConnected: new Style({
     fill: new Fill({ color: 'rgba(22, 163, 74, 0.22)' }),
@@ -53,6 +59,7 @@ const styles = {
       fill: new Fill({ color: '#14532d' }),
       stroke: new Stroke({ color: '#f0fdf4', width: 3 }),
     }),
+    zIndex: 50,
   }),
 };
 
@@ -180,7 +187,8 @@ function App() {
 
   const loadSchoolsLayer = async () => {
     const response = await axios.get(`${API_URL}/schools`);
-    setLayerFeatures('schools', parseGeoJsonFeatures(response.data));
+    const features = parseGeoJsonFeatures(response.data);
+    setLayerFeatures('schools', features);
   };
 
   const loadSchoolBufferLayer = async () => {
@@ -309,6 +317,8 @@ function App() {
         gid,
         name: pickedFeature.get('name') || 'Mining site',
         isConnected: Boolean(pickedFeature.get('is_connected')),
+        pathLength: Number(pickedFeature.get('path_length') || 0),
+        connectionCost: Number(pickedFeature.get('connection_cost') || 0),
         reasonCode: pickedFeature.get('reason_code') || null,
         pathStrategy: pickedFeature.get('path_strategy') || null,
       });
@@ -347,6 +357,8 @@ function App() {
       gid: Number(gid),
       name: feature.get('name') || 'Mining site',
       isConnected: Boolean(feature.get('is_connected')),
+      pathLength: Number(feature.get('path_length') || 0),
+      connectionCost: Number(feature.get('connection_cost') || 0),
       reasonCode: feature.get('reason_code') || null,
       pathStrategy: feature.get('path_strategy') || null,
     });
@@ -730,7 +742,7 @@ function App() {
             </p>
             <p>
               Total generated length:{' '}
-              <strong>{Number(statistics.new_roads_length || 0).toFixed(2)} km</strong>
+              <strong>{Math.round(Number(statistics.total_path_length_m || 0)).toLocaleString()} m</strong>
             </p>
           </div>
         </section>
@@ -764,6 +776,12 @@ function App() {
             <p><strong>Site {selectedSiteInfo.gid}</strong></p>
             <p>{selectedSiteInfo.name}</p>
             <p>Status: {selectedSiteInfo.isConnected ? 'Connected' : 'Blocked / pending'}</p>
+            {selectedSiteInfo.isConnected && selectedSiteInfo.pathLength > 0 && (
+              <p>Route length: {Math.round(selectedSiteInfo.pathLength).toLocaleString()} m</p>
+            )}
+            {selectedSiteInfo.isConnected && selectedSiteInfo.connectionCost > 0 && (
+              <p>Route cost: {Math.round(selectedSiteInfo.connectionCost).toLocaleString()} m</p>
+            )}
             {selectedSiteInfo.reasonCode && <p>Reason: {selectedSiteInfo.reasonCode}</p>}
             {selectedSiteInfo.pathStrategy && <p>Planner: {selectedSiteInfo.pathStrategy}</p>}
           </section>
@@ -785,6 +803,7 @@ function App() {
           <div className="legend-row"><span className="swatch swatch-mine" />Mining site</div>
           <div className="legend-row"><span className="swatch swatch-mine-connected" />Connected site</div>
           <div className="legend-row"><span className="swatch swatch-school" />School</div>
+          <div className="legend-row"><span className="swatch swatch-school-buffer" />School buffer</div>
           <div className="legend-row"><span className="swatch swatch-river" />River</div>
         </div>
       </main>
